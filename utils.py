@@ -1,5 +1,72 @@
 import numpy as np
+import numpy as np
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.cluster import KMeans
+from matplotlib import pyplot as plt
+from helper_functions import MSCE as MSCE
+import MAccWitness
+from itertools import product
 
+# grid search on the best parameters
+def grid_search_params(witness_metric, X_val, y_val):
+    n_splits = 5
+    kf = KFold(n_splits=n_splits, random_state = 42, shuffle=True)
+    if witness_metric == 'rbf':
+        gamma = np.arange(1, 10, 0.5)
+        scores = np.zeros(len(gamma))
+        for g in range(len(gamma)):
+            wit = MAccWitness(gamma=gamma[g], metric=witness_metric)
+            wit_model = make_pipeline(StandardScaler(), wit)
+            score = cross_val_score(wit_model,X_val ,y_val,cv=kf,n_jobs=n_splits).mean()
+            scores[g] = score
+        #defining the optimal found witness function
+        idx_max = np.nanargmax(scores.flatten())
+        gopt = gamma[idx_max]
+        print(f"Optimal Gamma: {gopt}")
+        return gopt
+
+    elif witness_metric == 'sigmoid':
+        gamma = np.arange(1,10,0.5)
+        coef0 = np.arange(-5, 5, 1)
+        combos = list(product(range(len(gamma)), range(len(coef0))))
+        scores = np.zeros((len(gamma), len(coef0)))
+        #evaluating for each gamma the resulting witness function
+        for g, c in combos:
+            wit = MAccWitness(gamma=gamma[g], metric=witness_metric, coef0=coef0[c])
+            wit_model = make_pipeline(StandardScaler(), wit)
+            score = cross_val_score(wit_model,X_val,y_val,cv=kf,n_jobs=n_splits).mean()
+            scores[g, c] = score
+        #defining the optimal found witness function
+        idx_max = np.nanargmax(scores.flatten())
+        gopt, copt = combos[idx_max]
+        gopt, copt = gamma[gopt], coef0[copt]
+        print(f"Optimal Gamma: {gopt}, Optimal Coef: {copt}")
+        return [gopt, copt]
+
+    elif witness_metric == 'poly':
+        # Optimal Gamma: 0.05, Optimal Coef: 1.5, Optimal Degree: 2
+        gamma = [0.04, 0.05, 0.06, 0.1, 0.5]
+        coef0 = [0, 0.5, 0.7, 1, 1.5, 2]
+        degree = [2,3,4]
+        combos = list(product(range(len(gamma)), range(len(coef0)), range(len(degree))))
+        scores = np.zeros((len(gamma), len(coef0), len(degree)))
+
+        #evaluating for each gamma the resulting witness function
+        for g, c, d in combos:
+            wit = MAccWitness(gamma=gamma[g], metric=witness_metric, coef0=coef0[c], degree=degree[d])
+            wit_model = make_pipeline(StandardScaler(), wit)
+            score = cross_val_score(wit_model,X_val,y_val,cv=kf,n_jobs=n_splits).mean()
+            scores[g, c] = score
+        #defining the optimal found witness function
+        idx_max = np.nanargmax(scores.flatten())
+        gopt, copt, dopt = combos[idx_max]
+        gopt, copt, dopt = gamma[gopt], coef0[copt], degree[dopt]
+        print(f"Optimal Gamma: {gopt}, Optimal Coef: {copt}, Optimal Degree: {dopt}")
+        return [gopt, copt, dopt]
+    
 def gen_preds(model):
     return lambda x: model.predict_proba(x)[:, 1] # get predictions from MCBoost
 
@@ -35,4 +102,323 @@ def con_cal_err(bin, wit_value, y_pred, yhat_proba):
       err += (temp_sum ** 2) * frac
   return err
 
+def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test, y_test, wit_predictions_LS, test_predictions, yhat_proba_test,  g_wit, g_test, MCBoost_test, MCBoost_wit, baseline_model, wit_prob_pos_isotonic, prob_pos_isotonic, wit_prob_pos_ablated, prob_pos_ablated):
 
+  # ----------------------------------------
+  if baseline_model == "Logistic_Regression":
+    num_cluster = 5
+  elif baseline_model == "Decision_Tree":
+    num_cluster = 7
+  elif baseline_model == "Random_Forest":
+    num_cluster = 5
+  else:
+    num_cluster = 3
+
+  g_test_binned = KMeans(n_clusters=num_cluster, random_state=0, n_init="auto").fit(g_test.reshape(-1, 1))
+  g_wit_bin = KMeans(n_clusters=num_cluster, random_state=0, n_init="auto").fit(g_wit.reshape(-1, 1))
+  yhat_proba_test_binned = KMeans(n_clusters=num_cluster, random_state=0, n_init="auto").fit(yhat_proba_test.reshape(-1, 1))
+
+  g_new = np.zeros(len(g_test))
+  gwit_new = np.zeros(len(g_wit))
+  yhat_new = np.zeros(len(yhat_proba_test))
+  for i in range(num_cluster): # number of cluster here
+    ind1 = np.where(g_test_binned.labels_ ==i )
+    ind2 = np.where(yhat_proba_test_binned.labels_ == i)
+    ind3 = np.where(g_wit_bin.labels_==i)
+    g_new[ind1] = g_test_binned.cluster_centers_[i]
+    yhat_new[ind2] = yhat_proba_test_binned.cluster_centers_[i]
+    gwit_new[ind3] = g_wit_bin.cluster_centers_[i]
+
+  # print(g_test_binned_new)
+
+  # compare c* error_test and c* g_error_test
+  base_KCE = compute_calibration_error(wit_test, y_test, yhat_proba_test) # wit_test defined on f
+  print(f"Baseline Kernel calibration error: {base_KCE}")
+
+  # define new witness on g (updated model)
+  wit = MAccWitness(gamma=gopt, metric=witness_metric)
+  wit_model = make_pipeline(StandardScaler(), wit)
+  error_wit = y_wit - g_wit
+  wit_model.fit(X_wit, error_wit)
+  wit_test_g = wit_model.predict(X_test)
+
+  kmulcal_KCE = compute_calibration_error(wit_test_g, y_test, g_test)
+  print(f"Our Method's kernel calibration error: {kmulcal_KCE}")
+
+  # define new witness on LSBoost (updated model)
+  error_wit = y_wit - wit_predictions_LS
+  wit_model.fit(X_wit, error_wit)
+  wit_test_LS = wit_model.predict(X_test)
+  lsboost_KCE = compute_calibration_error(wit_test_LS,y_test, test_predictions)
+  print(f"LSBoost kernel calibration error: {lsboost_KCE}")
+
+  # # kernel error for binned f(x) and g(x)
+  # # define new witness on binned baseline(updated model)
+  # val_binned = KMeans(n_clusters=num_cluster, random_state=0, n_init="auto").fit(y_wit.reshape(-1, 1))
+  # error_wit = y_wit - val_binned
+  # wit_model.fit(X_wit, error_wit)
+  # wit_test_f_binned = wit_model.predict(X_test)
+  # base_binned_KCE = compute_calibration_error(wit_test_f_binned, y_test, yhat_new)
+  # print(f"Baseline Kernel calibration error, binned: {base_binned_KCE}")
+  base_binned_KCE  = 0 #placeholder
+
+  # define new witness on binned g(updated model)
+  error_wit = y_wit - gwit_new
+  wit_model.fit(X_wit, error_wit)
+  wit_test_g_binned = wit_model.predict(X_test)
+  kmulcal_binned_KCE = compute_calibration_error(wit_test_g_binned, y_test, g_new)
+  print(f"Our Method's Kernel calibration error, binned: {kmulcal_binned_KCE}")
+
+  # # condition calibration error
+  # con_cal_error1 = con_cal_err(num_bins, wit_test, y_test, g_test)
+  # print(f"our condition calibration error: {con_cal_error1}")
+
+  # con_cal_error2 = con_cal_err(num_bins, wit_test, y_test, test_predictions)
+  # print(f"BoostReg condition calibration error: {con_cal_error2}")
+
+  # compare standard calibration metric
+  base_msce = MSCE(y_test, yhat_proba_test)
+  print(f'Baseline MSCE: {base_msce:.6f}')
+
+  kmulcal_msce = MSCE(y_test, g_test)
+  print(f'Our Method\'s MSCE: {kmulcal_msce:.6f}')
+
+  lsboost_msce = MSCE(y_test, test_predictions)
+  # print(f'Our Method\'s MS Calibration Error: {MSCE(y_test, g_test):.6f}')
+  print(f'LSBoost MSCE: {lsboost_msce:.6f}')
+
+  # MSCE for binned f(x) and g(x)
+  base_msce_binned = MSCE(y_test, yhat_new)
+  print(f'Baseline MSCE, binned: {base_msce_binned:.6f}')
+
+  kmulcal_msce_binned = MSCE(y_test, g_new)
+  print(f'Our Method\'s MSCE, binned: {kmulcal_msce_binned:.6f}')
+
+  MCBoost_msce = MSCE(y_test, MCBoost_test)
+  # define new witness on MCBoost(updated model)
+  error_wit = y_wit - MCBoost_wit
+  wit_model.fit(X_wit, error_wit)
+  wit_test_mcboost = wit_model.predict(X_test)
+  MCBoost_KCE = compute_calibration_error(wit_test_mcboost, y_test, MCBoost_test)
+
+  isotonic_cal_msce = MSCE(y_test, prob_pos_isotonic)
+  # define new witness on KMAcc+isotonic (updated model)
+  error_wit = y_wit - wit_prob_pos_isotonic
+  wit_model.fit(X_wit, error_wit)
+  wit_test_iso = wit_model.predict(X_test)
+  isotonic_cal_KCE = compute_calibration_error(wit_test_iso, y_test, prob_pos_isotonic)
+
+  ablated_msce = MSCE(y_test, prob_pos_ablated)
+  # define new witness on baseline+isotonic (updated model)
+  error_wit = y_wit - wit_prob_pos_ablated
+  wit_model.fit(X_wit, error_wit)
+  wit_test_ablated = wit_model.predict(X_test)
+  ablated_KCE = compute_calibration_error(wit_test_ablated, y_test, prob_pos_ablated)
+
+  # import matplotlib.pyplot as plt
+  # plt.hist(g_new, label='ours')
+  # plt.hist(test_predictions)
+  # plt.title(f'K Means data visualization for {baseline_model}')
+  # plt.show()
+
+  # auc = roc_auc_score(y_test, )
+  AUC = [roc_auc_score(y_test, yhat_proba_test), roc_auc_score(y_test, g_test), \
+         roc_auc_score(y_test, test_predictions), \
+         roc_auc_score(y_test, g_new), roc_auc_score(y_test, MCBoost_test), \
+         roc_auc_score(y_test, prob_pos_isotonic), \
+         roc_auc_score(y_test, prob_pos_ablated)] #,
+
+
+  return base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, \
+         base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, \
+         MCBoost_msce, MCBoost_KCE, isotonic_cal_msce, isotonic_cal_KCE, ablated_msce, ablated_KCE, AUC
+
+
+def mega_compute(wit_test, y_test, yhat_proba_test, test_predictions, g_test, MCBoost_test, baseline_model, prob_pos_isotonic, prob_pos_sigmoid, prob_pos_ablated):
+
+  if baseline_model == "Logistic_Regression":
+    num_cluster = 5
+  elif baseline_model == "Decision_Tree":
+    num_cluster = 7
+  elif baseline_model == "Random_Forest":
+    num_cluster = 5
+  else:
+    num_cluster = 3
+
+  g_test_binned = KMeans(n_clusters=num_cluster, random_state=0, n_init="auto").fit(g_test.reshape(-1, 1))
+
+  yhat_proba_test_binned = KMeans(n_clusters=num_cluster, random_state=0, n_init="auto").fit(yhat_proba_test.reshape(-1, 1))
+
+  g_new = np.zeros(len(g_test))
+  yhat_new = np.zeros(len(yhat_proba_test))
+  for i in range(num_cluster): # number of cluster here
+    ind1 = np.where(g_test_binned.labels_ ==i )
+    ind2 = np.where(yhat_proba_test_binned.labels_ == i)
+    g_new[ind1] = g_test_binned.cluster_centers_[i]
+    yhat_new[ind2] = yhat_proba_test_binned.cluster_centers_[i]
+
+  # print(g_test_binned_new)
+
+  # compare c* error_test and c* g_error_test
+  base_KCE = compute_calibration_error(wit_test, y_test, yhat_proba_test)
+  print(f"Baseline Kernel calibration error: {base_KCE}")
+
+  kmulcal_KCE = compute_calibration_error(wit_test, y_test, g_test)
+  print(f"Our Method's kernel calibration error: {kmulcal_KCE}")
+
+  lsboost_KCE = compute_calibration_error(wit_test,y_test, test_predictions)
+  print(f"LSBoost kernel calibration error: {lsboost_KCE}")
+
+  # kernel error for binned f(x) and g(x)
+  base_binned_KCE = compute_calibration_error(wit_test, y_test, yhat_new)
+  print(f"Baseline Kernel calibration error, binned: {base_binned_KCE}")
+
+  kmulcal_binned_KCE = compute_calibration_error(wit_test, y_test, g_new)
+  print(f"Our Method's Kernel calibration error, binned: {kmulcal_binned_KCE}")
+
+  # # condition calibration error
+  # con_cal_error1 = con_cal_err(num_bins, wit_test, y_test, g_test)
+  # print(f"our condition calibration error: {con_cal_error1}")
+
+  # con_cal_error2 = con_cal_err(num_bins, wit_test, y_test, test_predictions)
+  # print(f"BoostReg condition calibration error: {con_cal_error2}")
+
+  # compare standard calibration metric
+  base_msce = MSCE(y_test, yhat_proba_test)
+  print(f'Baseline MSCE: {base_msce:.6f}')
+
+  kmulcal_msce = MSCE(y_test, g_test)
+  print(f'Our Method\'s MSCE: {kmulcal_msce:.6f}')
+
+  lsboost_msce = MSCE(y_test, test_predictions)
+  # print(f'Our Method\'s MS Calibration Error: {MSCE(y_test, g_test):.6f}')
+  print(f'LSBoost MSCE: {lsboost_msce:.6f}')
+
+  # MSCE for binned f(x) and g(x)
+  base_msce_binned = MSCE(y_test, yhat_new)
+  print(f'Baseline MSCE, binned: {base_msce_binned:.6f}')
+
+  kmulcal_msce_binned = MSCE(y_test, g_new)
+  print(f'Our Method\'s MSCE, binned: {kmulcal_msce_binned:.6f}')
+
+  MCBoost_msce = MSCE(y_test, MCBoost_test)
+  MCBoost_KCE = compute_calibration_error(wit_test, y_test, MCBoost_test)
+
+  isotonic_cal_msce = MSCE(y_test, prob_pos_isotonic)
+  isotonic_cal_KCE = compute_calibration_error(wit_test, y_test, prob_pos_isotonic)
+
+  sigmoid_cal_msce = MSCE(y_test, prob_pos_sigmoid)
+  sigmoid_cal_KCE = compute_calibration_error(wit_test, y_test, prob_pos_sigmoid)
+
+  ablated_msce = MSCE(y_test, prob_pos_ablated)
+  ablated_KCE = compute_calibration_error(wit_test, y_test, prob_pos_ablated)
+
+  import matplotlib.pyplot as plt
+  plt.hist(g_new, label='ours')
+  plt.hist(test_predictions)
+  plt.title(f'K Means data visualization for {baseline_model}')
+  plt.show()
+
+  # auc = roc_auc_score(y_test, )
+  AUC = [roc_auc_score(y_test, yhat_proba_test), roc_auc_score(y_test, g_test), \
+         roc_auc_score(y_test, test_predictions), \
+         roc_auc_score(y_test, g_new), roc_auc_score(y_test, MCBoost_test), \
+         roc_auc_score(y_test, prob_pos_isotonic), \
+         roc_auc_score(y_test, prob_pos_ablated)] #,
+
+
+  return base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, \
+         base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, \
+         MCBoost_msce, MCBoost_KCE, isotonic_cal_msce, isotonic_cal_KCE, sigmoid_cal_msce,\
+         sigmoid_cal_KCE, ablated_msce, ablated_KCE, AUC
+
+def plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, baseline_model, prefix = ""):
+  x = np.array([np.mean(base_KCE, axis = 0), np.mean(kmulcal_KCE, axis = 0), np.mean(lsboost_KCE, axis = 0), \
+                np.mean(kmulcal_binned_KCE, axis = 0), np.mean(MCBoost_KCE, axis = 0), np.mean(isotonic_KCE, axis = 0), np.mean(ablated_KCE, axis = 0)])
+  y = np.array([np.mean(base_msce, axis = 0), np.mean(kmulcal_msce, axis = 0), np.mean(lsboost_msce, axis = 0), \
+                np.mean(kmulcal_msce_binned, axis = 0), np.mean(MCBoost_msce, axis=0), np.mean(isotonic_msce, axis = 0), np.mean(ablated_msce, axis = 0)])
+  z = np.mean(AUC, axis = 0) ## replace with AUC values
+  # l = ['Baseline', 'KMultiCal', 'LS Boost', 'Baseline + KMeans', 'KMultiCal + KMeans']
+
+  # markers = ['o', 's', '^', 'D', 'v']
+
+  x_std = np.array([np.std(base_KCE, axis = 0), np.std(kmulcal_KCE, axis = 0), np.std(lsboost_KCE, axis = 0), np.std(kmulcal_binned_KCE, axis = 0), np.std(MCBoost_KCE, axis = 0), np.std(isotonic_KCE, axis = 0), np.std(ablated_KCE, axis = 0)])
+
+  y_std = np.array([np.std(base_msce, axis = 0), np.std(kmulcal_msce, axis = 0), np.std(lsboost_msce, axis = 0),  np.std(kmulcal_msce_binned, axis = 0), np.std(MCBoost_msce, axis=0), np.std(isotonic_msce, axis = 0), np.std(ablated_msce, axis = 0)])
+
+
+  colors = ['steelblue','darkgoldenrod','coral','gray','limegreen', 'darkred', 'indigo']
+  markersize = 40
+  sns.set(style="whitegrid", color_codes=True)
+  base = plt.scatter(x[0], y[0], c=colors[0], marker = 'o', s = markersize)
+  kma = plt.scatter(x[1], y[1], c=colors[1], marker = 's', s = markersize)
+  lsb = plt.scatter(x[2], y[2], c=colors[2], marker = 'p', s = markersize)
+  kmak = plt.scatter(x[3], y[3], c=colors[3], marker = 'x', s = markersize)
+  mcb = plt.scatter(x[4], y[4], c=colors[4], marker = '^', s = markersize)
+  iso = plt.scatter(x[5], y[5], c=colors[5], marker = 'd', s = markersize)
+  abl = plt.scatter(x[6], y[6], c=colors[6], marker = 'h', s = markersize)
+
+  norm = plt.Normalize(0.7, 1)
+  m = plt.cm.ScalarMappable(cmap="Reds", norm = norm)
+  m.set_array([])
+
+  # cm=plt.get_cmap('Reds')
+  # for i, (xval, yval, x_error_val, y_error_val, zval) in enumerate(zip(x, y, x_std, y_std, z)):
+  #     # colour=cm(0.7*zval)
+  #     # print(zval)
+  #     plt.errorbar(xval, yval, xerr=x_error_val, yerr=y_error_val, linestyle='', ecolor=cm(zval), alpha = 0.3, capsize = 3)
+
+  plt.errorbar(x[0], y[0], xerr=x_std[0], yerr=y_std[0], linestyle='', color = colors[0], alpha = 1)
+  plt.errorbar(x[1], y[1], xerr=x_std[1], yerr=y_std[1], linestyle='', color= colors[1], alpha = 1)
+  plt.errorbar(x[2], y[2], xerr=x_std[2], yerr=y_std[2], linestyle='', color= colors[2], alpha = 1)
+  plt.errorbar(x[3], y[3], xerr=x_std[3], yerr=y_std[3], linestyle='', color= colors[3], alpha = 1)
+  plt.errorbar(x[4], y[4], xerr=x_std[4], yerr=y_std[4], linestyle='', color= colors[4], alpha = 1)
+  plt.errorbar(x[5], y[5], xerr=x_std[5], yerr=y_std[5], linestyle='', color= colors[5], alpha = 1)
+  plt.errorbar(x[6], y[6], xerr=x_std[6], yerr=y_std[6], linestyle='', color= colors[6], alpha = 1)
+
+  # base.figure.colorbar(m, label = 'AUC')
+  # cbar = plt.colorbar(base)
+  # cbar.set_label('AUC')
+
+  plt.xlabel('KME', weight='bold')
+  plt.ylabel('MSCE', weight='bold')
+
+  if baseline_model == "Logistic_Regression":
+    plt.title('Logistic Regression', weight='bold')
+  elif baseline_model == "Decision_Tree":
+    plt.title('Decision Tree', weight='bold')
+  elif baseline_model == "Random_Forest":
+    plt.title('Random Forest', weight='bold')
+  elif baseline_model == "Kernel_SVM":
+    plt.title('Kernel SVM', weight='bold')
+  elif baseline_model == "Naive_Bayes":
+    plt.title("Gaussian Naive Bayes", weight='bold')
+  elif baseline_model == "NN":
+    plt.title("Neural Network", weight='bold')
+  else:
+    plt.title('')
+
+  plt.rcParams["font.family"] = "monospace"
+  plt.rcParams['font.size']=15
+
+  plt.ylim(bottom=-.01)
+  plt.xlim(left=0)
+
+  #### legend only for last plot
+  plt.legend((base, kma, lsb, kmak, mcb, iso, abl),
+           (f'baseline (AUC: {z[0]:.3f})', f'KMultiAcc (AUC: {z[1]:.3f})', \
+            f'LS Boost (AUC: {z[2]:.3f})', f'KMultiAcc + KMeans (AUC: {z[3]:.3f})', f'MC Boost (AUC: {z[4]:.3f})', \
+            f'KMultiAcc + Isotonic Calibration (AUC: {z[5]:.3f})', f'Baseline + Isotonic Calibration (AUC: {z[6]:.3f})'))
+
+  plt.savefig('plots/'+ prefix + baseline_model + '.png',format='png', dpi=300)
+  plt.show()
+
+def plot_for_task(features, labels, base_classifiers, prefix):
+  for classifier in base_classifiers:
+    base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
+    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC = achieving_calibration_with_witness(features, labels, classifier)
+
+    plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
+    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, classifier, prefix)

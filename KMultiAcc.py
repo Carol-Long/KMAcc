@@ -12,6 +12,8 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.neural_network import MLPClassifier
 import cvxpy as cp
 from sklearn.naive_bayes import GaussianNB
+import MAccWitness
+from utils import grid_search_params
 
 from utils import compute_calibration_error
 
@@ -59,13 +61,13 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     # search for optimal rbf kernel param using witness set
     self.gopt = grid_search_params(witness_metric, X_wit, error_wit)
 
-    # define witness on train and validation
+    # define witness on witness set
     wit = MAccWitness(gamma=self.gopt, metric=witness_metric)
 
     self.wit_model = make_pipeline(StandardScaler(), wit)
     self.wit_model.fit(X_wit, error_wit)
 
-    # search for best lambda (parameter for the updated predictor)
+    # search for best lambda using validation set (parameter for the updated predictor)
     wit_val = self.wit_model.predict(X_val)
 
     ## Put in QP
@@ -177,4 +179,3 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     print(f"Lambda dual: {val[0], val[1]}")
     eps = (val[n+2:] - val[2:n+2])
     return l, eps
-  
