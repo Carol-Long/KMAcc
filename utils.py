@@ -414,11 +414,21 @@ def plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboos
   plt.show()
 
 def plot_for_task(features, labels, base_classifiers, prefix):
+  data_class = []
   for classifier in base_classifiers:
     base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
     isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC = achieving_calibration_with_witness(features, labels, classifier)
 
+    data_class.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
+    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC))
+
     plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
     isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, classifier, prefix)
+
+    # save data_class
+    save_df = pd.DataFrame(data_class)
+    filename = prefix + 'all.csv'
+    save_df.to_csv(filename)
