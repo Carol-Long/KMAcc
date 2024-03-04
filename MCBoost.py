@@ -265,6 +265,7 @@ class MCBoost:
         self.partition = partition
         self.multiplicative = multiplicative
         self.iter_corrs = [0] * max_iter
+        self._is_fitted_ = False
 
         if subpops is not None:
             self.subpop_fitter = SubpopFitter(subpops)
@@ -398,3 +399,79 @@ class MCBoost:
             all_preds.append(new_preds)
         return all_preds
 
+    # a copy of the multicalibrate function, to enable isotonic calibration
+    def fit(self, data, labels):
+        """
+        Performs multiaccuracy/multicalibration boost algorithm.
+        (Multicalibration is achieved by setting "rebucket"=True)
+
+        Given an initial hypothesis (in the form of the predictions
+        on validation data), labels on validation data, an auditing
+        algorithm, and an accuracy parameter alpha, returns a series of
+        trained models that can be used to produce multiaccuracy-boosted
+        predictions in combination with the original model.
+
+        Returns a list of models and list of the applicable partitions.
+
+        See paper https://arxiv.org/pdf/1805.12317.pdf (Kim et al. 2018).
+        """
+        self.classes_ = unique_labels(labels)
+        pred_probs = self.predictor(data)
+        resid = pred_probs - labels
+        buckets = [ProbRange()]  # applies to all datapoints
+        if self.partition and self.num_buckets > 1:
+            frac = 1 / self.num_buckets
+            buckets += [ProbRange(b * frac, (b+1) / frac)
+                        for b in range(self.num_buckets)]
+            buckets[-1].upper = 1.0  # deal with floating point rounding errors
+
+        new_probs = np.array(pred_probs, copy=True)
+
+        for it in range(self.max_iter):
+            corrs = np.zeros(len(buckets))
+            models = []
+
+            # fit on various partitions
+            probs = new_probs if self.rebucket else pred_probs
+            for i, partition in enumerate(buckets):
+                mask = within_range_mask(probs, partition)
+                data_m = data[mask]
+                resid_m = resid[mask]
+                corrs[i], model = self.subpop_fitter.fit_to_resid(data_m,
+                                                                  resid_m)
+                models.append(model)
+
+
+            if corrs.max() < self.alpha:  # lower than threshold
+                for k in range(it, self.max_iter):
+                    self.iter_corrs[k] = corrs[int(corrs.argmax())]
+                break
+            else:
+                # update prediction probabilities
+                self.iter_corrs[it] = corrs[int(corrs.argmax())]
+                max_key = buckets[int(corrs.argmax())]
+                prob_mask = within_range_mask(probs, max_key)
+                self.iter_models.append(models[int(corrs.argmax())])
+                self.iter_partitions.append(max_key)
+                new_probs = self.update_probs(new_probs, self.iter_models[-1],
+                                              data, mask=prob_mask)
+                resid = new_probs - labels  # recalculate residuals
+        self._is_fitted_ = True
+
+        return self
+    # a copy of the predict_prob function, to enable isotonic calibration
+    def predict_proba(self, X, t=float('inf'), **kwargs):
+        # change method name to predict?
+        # able to access predictions at various iterations
+        """ Apply multiplicative weight updates using multiple models. Option
+        to pass kwargs to the predict function via the update_probs function.
+        """
+        orig_preds = self.predictor(X)
+        new_preds = np.array(orig_preds, copy=True)
+        for i, m in enumerate(self.iter_models):
+            if i <= t:
+                probs = new_preds if self.rebucket else orig_preds
+                mask = within_range_mask(probs, self.iter_partitions[i])
+                new_preds = self.update_probs(new_preds, m, X, mask=mask,
+                                              **kwargs)
+        return np.column_stack((1 - new_preds, new_preds))

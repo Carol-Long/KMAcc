@@ -102,7 +102,8 @@ def con_cal_err(bin, wit_value, y_pred, yhat_proba):
       err += (temp_sum ** 2) * frac
   return err
 
-def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test, y_test, wit_predictions_LS, test_predictions, yhat_proba_test,  g_wit, g_test, MCBoost_test, MCBoost_wit, baseline_model, wit_prob_pos_isotonic, prob_pos_isotonic, wit_prob_pos_ablated, prob_pos_ablated):
+def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test, y_test, wit_predictions_LS, test_predictions, yhat_proba_test,  g_wit, g_test, MCBoost_test, MCBoost_wit, \
+                           baseline_model, wit_prob_pos_isotonic, prob_pos_isotonic, wit_prob_pos_ablated, prob_pos_ablated, prob_test_mcboost_isotonic, prob_wit_mcboost_isotonic):
 
   # ----------------------------------------
   if baseline_model == "Logistic_Regression":
@@ -201,6 +202,13 @@ def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test,
   wit_test_mcboost = wit_model.predict(X_test)
   MCBoost_KCE = compute_calibration_error(wit_test_mcboost, y_test, MCBoost_test)
 
+  MCBoost_iso_msce = MSCE(y_test, prob_test_mcboost_isotonic)
+  # define new witness on MCBoost + isotonic
+  error_wit = y_wit - prob_wit_mcboost_isotonic
+  wit_model.fit(X_wit, error_wit)
+  wit_test_mcboost_iso = wit_model.predict(X_test)
+  MCBoost_iso_KCE = compute_calibration_error(wit_test_mcboost_iso, y_test, prob_test_mcboost_isotonic)
+
   isotonic_cal_msce = MSCE(y_test, prob_pos_isotonic)
   # define new witness on KMAcc+isotonic (updated model)
   error_wit = y_wit - wit_prob_pos_isotonic
@@ -231,7 +239,9 @@ def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test,
 
   return base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, \
          base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, \
-         MCBoost_msce, MCBoost_KCE, isotonic_cal_msce, isotonic_cal_KCE, ablated_msce, ablated_KCE, AUC
+         MCBoost_msce, MCBoost_KCE, isotonic_cal_msce, isotonic_cal_KCE, \
+         ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE
+
 
 
 def mega_compute(wit_test, y_test, yhat_proba_test, test_predictions, g_test, MCBoost_test, baseline_model, prob_pos_isotonic, prob_pos_sigmoid, prob_pos_ablated):
@@ -332,7 +342,8 @@ def mega_compute(wit_test, y_test, yhat_proba_test, test_predictions, g_test, MC
          MCBoost_msce, MCBoost_KCE, isotonic_cal_msce, isotonic_cal_KCE, sigmoid_cal_msce,\
          sigmoid_cal_KCE, ablated_msce, ablated_KCE, AUC
 
-def plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, baseline_model, prefix = ""):
+def plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, \
+            MCBoost_msce, MCBoost_KCE, isotonic_msce, isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, baseline_model, prefix, MCBoost_iso_msce, MCBoost_iso_KCE):
   x = np.array([np.mean(base_KCE, axis = 0), np.mean(kmulcal_KCE, axis = 0), np.mean(lsboost_KCE, axis = 0), \
                 np.mean(kmulcal_binned_KCE, axis = 0), np.mean(MCBoost_KCE, axis = 0), np.mean(isotonic_KCE, axis = 0), np.mean(ablated_KCE, axis = 0)])
   y = np.array([np.mean(base_msce, axis = 0), np.mean(kmulcal_msce, axis = 0), np.mean(lsboost_msce, axis = 0), \
@@ -418,15 +429,15 @@ def plot_for_task(features, labels, base_classifiers, prefix):
   for classifier in base_classifiers:
     base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC = achieving_calibration_with_witness(features, labels, classifier)
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE = achieving_calibration_with_witness(features, labels, classifier)
 
     data_class.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC))
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE))
 
     plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, classifier, prefix)
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, classifier, prefix, MCBoost_iso_msce, MCBoost_iso_KCE)
 
     # save data_class
     save_df = pd.DataFrame(data_class)

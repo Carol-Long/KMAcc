@@ -62,6 +62,8 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
   ablated_msce = []
   ablated_KCE = []
   AUC = []
+  MCBoost_iso_msce = []
+  MCBoost_iso_KCE = []
 
   save_np = []
   for seed in range(2, 25, 5):
@@ -150,16 +152,24 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
     # MCBoost
     model.fit(X_train, y_train)
     mcrf1 = MCBoost(partition = True, multiplicative = True, init_predictor = gen_preds(model), max_iter = 10)
-    mcrf1.multicalibrate(X_train_wit_val, y_train_wit_val)
+    mcrf1.fit(X_train_wit_val, y_train_wit_val)
 
-    MCBoost_test = mcrf1.predict_prob(X_test)
-    MCBoost_wit = mcrf1.predict_prob(X_wit)
+    MCBoost_test = mcrf1.predict_proba(X_test)[:, 1]
+    MCBoost_wit = mcrf1.predict_proba(X_wit)[:, 1]
+
+    # MCBoost w isotonic calibration
+    mcboost_isotonic = CalibratedClassifierCV(mcrf1, cv="prefit", method="isotonic")
+    mcboost_isotonic.fit(X_val, y_val)
+    prob_test_mcboost_isotonic = mcboost_isotonic.predict_proba(X_test)[:, 1]
+    prob_wit_mcboost_isotonic = mcboost_isotonic.predict_proba(X_wit)[:, 1]    
 
     base_msce_temp, base_KCE_temp, kmulcal_msce_temp, kmulcal_KCE_temp, lsboost_msce_temp, lsboost_KCE_temp, \
          base_msce_binned_temp, base_binned_KCE_temp, kmulcal_msce_binned_temp, kmulcal_binned_KCE_temp, \
-         MCBoost_msce_temp, MCBoost_KCE_temp, isotonic_cal_msce_temp, isotonic_cal_KCE_temp, ablated_msce_temp, ablated_KCE_temp, AUC_temp \
-         = mega_compute_corrected(kma.gopt, witness_metric, wit_test, X_wit, y_wit, X_test, y_test, wit_predictions_LS, test_predictions, yhat_proba_test,  \
-                                  g_wit, g_test, MCBoost_test, MCBoost_wit, baseline_model, wit_prob_pos_isotonic, prob_pos_isotonic, wit_prob_pos_ablated, prob_pos_ablated)
+         MCBoost_msce_temp, MCBoost_KCE_temp, isotonic_cal_msce_temp, isotonic_cal_KCE_temp, ablated_msce_temp, ablated_KCE_temp, AUC_temp, \
+         MCBoost_iso_msce_temp, MCBoost_iso_KCE_temp \
+    = mega_compute_corrected(kma.gopt, witness_metric, wit_test, X_wit, y_wit, X_test, y_test, wit_predictions_LS, test_predictions, yhat_proba_test,  \
+                                  g_wit, g_test, MCBoost_test, MCBoost_wit, baseline_model, wit_prob_pos_isotonic, prob_pos_isotonic, \
+                                  wit_prob_pos_ablated, prob_pos_ablated, prob_test_mcboost_isotonic, prob_wit_mcboost_isotonic)
 
     # base_msce_temp, base_KCE_temp, kmulcal_msce_temp, kmulcal_KCE_temp, lsboost_msce_temp, \
     # lsboost_KCE_temp, base_msce_binned_temp, base_binned_KCE_temp, kmulcal_msce_binned_temp, kmulcal_binned_KCE_temp, \
@@ -183,6 +193,8 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
     MCBoost_KCE.append(MCBoost_KCE_temp)
     isotonic_msce.append(isotonic_cal_msce_temp)
     isotonic_KCE.append(isotonic_cal_KCE_temp)
+    MCBoost_iso_msce.append(MCBoost_iso_msce_temp)
+    MCBoost_iso_KCE.append(MCBoost_iso_KCE_temp)
     # sigmoid_msce.append(sigmoid_cal_msce_temp)
     # sigmoid_KCE.append(sigmoid_cal_kce_temp)
     ablated_msce.append(ablated_msce_temp)
@@ -193,7 +205,7 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
   return base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, \
          base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, \
          MCBoost_msce, MCBoost_KCE, isotonic_msce, isotonic_KCE, sigmoid_msce, sigmoid_KCE, \
-         ablated_msce, ablated_KCE, AUC
+         ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE
 
 # Income Task WA
 data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
@@ -208,11 +220,11 @@ data_class = []
 for classifier in base_classifiers:
     base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC = achieving_calibration_with_witness(features, labels, classifier)
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE = achieving_calibration_with_witness(features, labels, classifier)
 
     data_class.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC))
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE))
 
 # save data_class
 save_df = pd.DataFrame(data_class)
@@ -236,11 +248,11 @@ data2 = []
 for classifier in base_classifiers:
     base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC = achieving_calibration_with_witness(features, labels, classifier)
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE = achieving_calibration_with_witness(features, labels, classifier)
 
     data2.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
     kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC))
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE))
 
 # save data_class
 save_df = pd.DataFrame(data2)
