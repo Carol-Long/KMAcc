@@ -234,7 +234,8 @@ def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test,
          roc_auc_score(y_test, test_predictions), \
          roc_auc_score(y_test, g_new), roc_auc_score(y_test, MCBoost_test), \
          roc_auc_score(y_test, prob_pos_isotonic), \
-         roc_auc_score(y_test, prob_pos_ablated)] #,
+         roc_auc_score(y_test, prob_pos_ablated),\
+         roc_auc_score(y_test, prob_test_mcboost_isotonic)] #,
 
 
   return base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, \
@@ -423,23 +424,3 @@ def plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboos
 
   plt.savefig('plots/'+ prefix + baseline_model + '.png',format='png', dpi=300)
   plt.show()
-
-def plot_for_task(features, labels, base_classifiers, prefix):
-  data_class = []
-  for classifier in base_classifiers:
-    base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
-    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE = achieving_calibration_with_witness(features, labels, classifier)
-
-    data_class.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
-    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE))
-
-    plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
-    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, classifier, prefix, MCBoost_iso_msce, MCBoost_iso_KCE)
-
-    # save data_class
-    save_df = pd.DataFrame(data_class)
-    filename = prefix + 'all.csv'
-    save_df.to_csv(filename)

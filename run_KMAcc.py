@@ -1,5 +1,9 @@
 import sys
 sys.path.append('Level-Set-Boosting')
+from utils import *
+from KMultiAcc import KMultiAcc
+from MAccWitness import MAccWitness
+from MCBoost import MCBoost
 
 import numpy as np
 import pandas as pd
@@ -207,54 +211,81 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
          MCBoost_msce, MCBoost_KCE, isotonic_msce, isotonic_KCE, sigmoid_msce, sigmoid_KCE, \
          ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE
 
+
+def run_for_task(features, labels, base_classifiers, prefix):
+  data_class = []
+  for classifier in base_classifiers:
+    base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
+    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE = achieving_calibration_with_witness(features, labels, classifier)
+
+    data_class.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
+    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
+    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE))
+
+    # plotter(base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
+    # kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
+    # isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, classifier, prefix, MCBoost_iso_msce, MCBoost_iso_KCE)
+
+    # save data_class
+    save_df = pd.DataFrame(data_class)
+    filename = prefix + 'all.csv'
+    save_df.to_csv(filename)
+
+base_classifiers = ["Logistic_Regression", "Naive_Bayes", "Random_Forest", "NN"]
+
+# Employment task MA
+data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
+acs_data = data_source.get_data(states=["MA"], download=True)
+features, labels, group = ACSEmployment.df_to_numpy(acs_data)
+prefix = "EMP_MA_"
+run_for_task(features, labels, base_classifiers, prefix)
+
+# Employment task Al
+data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
+acs_data = data_source.get_data(states=["AL"], download=True)
+features, labels, group = ACSEmployment.df_to_numpy(acs_data)
+prefix = "EMP_AL_"
+run_for_task(features, labels, base_classifiers, prefix)
+
 # Income Task WA
 data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
 data = data_source.get_data(states=["WA"], download=True)
 features, labels, _ = ACSIncome.df_to_numpy(data)
 prefix = "Income_WA_"
+run_for_task(features, labels, base_classifiers, prefix)
 
-base_classifiers = ["Logistic_Regression", "Naive_Bayes", "Random_Forest", "NN"]
+# Income Task IL
+data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
+data = data_source.get_data(states=["IL"], download=True)
+features, labels, _ = ACSIncome.df_to_numpy(data)
+prefix = "Income_IL_"
+run_for_task(features, labels, base_classifiers, prefix)
 
-data_class = []
-
-for classifier in base_classifiers:
-    base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
-    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE = achieving_calibration_with_witness(features, labels, classifier)
-
-    data_class.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
-    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE))
-
-# save data_class
-save_df = pd.DataFrame(data_class)
-filename = prefix + 'all.csv'
-save_df.to_csv(filename)
-
-# Health Task WI
 # Health Public Coverage Task WI
 data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
 data = data_source.get_data(states=["WI"], download=True)
 features, labels, _ = ACSPublicCoverage.df_to_numpy(data)
 prefix = "Health_WI_"
+run_for_task(features, labels, base_classifiers, prefix)
 
-#plot_for_task(features, labels, base_classifiers, prefix)
+# Health Public Coverage Task OH
+data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
+data = data_source.get_data(states=["OH"], download=True)
+features, labels, _ = ACSPublicCoverage.df_to_numpy(data)
+prefix = "Health_OH_"
+run_for_task(features, labels, base_classifiers, prefix)
 
-base_classifiers = ["Logistic_Regression", "Naive_Bayes", "Random_Forest", "NN"]
+# ACS Mobility Task NJ
+data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
+data = data_source.get_data(states=["NJ"], download=True)
+features, labels, _ = ACSMobility.df_to_numpy(data)
+prefix = "Mobility_NJ_"
+run_for_task(features, labels, base_classifiers, prefix)
 
-
-data2 = []
-
-for classifier in base_classifiers:
-    base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
-    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE = achieving_calibration_with_witness(features, labels, classifier)
-
-    data2.append((base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, base_msce_binned, base_binned_KCE, \
-    kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce_Emp_AL_RF, \
-    isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, MCBoost_iso_msce, MCBoost_iso_KCE))
-
-# save data_class
-save_df = pd.DataFrame(data2)
-filename = prefix + 'all.csv'
-save_df.to_csv(filename)
+# ACS Mobility Task NY
+data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
+data = data_source.get_data(states=["NY"], download=True)
+features, labels, _ = ACSMobility.df_to_numpy(data)
+prefix = "Mobility_NY_"
+run_for_task(features, labels, base_classifiers, prefix)
