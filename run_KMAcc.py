@@ -2,42 +2,19 @@ import sys
 sys.path.append('Level-Set-Boosting')
 from utils import *
 from KMultiAcc import KMultiAcc
-from MAccWitness import MAccWitness
 from MCBoost import MCBoost
-
-import numpy as np
 import pandas as pd
-from sklearn.datasets import make_moons
-from folktables import ACSDataSource, ACSEmployment, ACSIncome, ACSTravelTime, ACSPublicCoverage, ACSMobility
-from folktables import BasicProblem
-import numpy as np
+from folktables import ACSDataSource, ACSEmployment, ACSIncome, ACSPublicCoverage, ACSMobility
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.model_selection import train_test_split
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics.pairwise import pairwise_kernels
-from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.model_selection import KFold, cross_val_score
-from sklearn.cluster import KMeans
 from sklearn.calibration import CalibratedClassifierCV
-from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from helper_functions import MSCE as MSCE
-from sklearn.metrics import mean_squared_error as MSE
-from sklearn.utils.validation import check_is_fitted
-from sklearn.utils.multiclass import unique_labels
 import LSBoost
-import helper_functions as hf
-from itertools import product
 from sklearn.neural_network import MLPClassifier
-
-import seaborn as sns
-import cvxpy as cp
 from sklearn.naive_bayes import GaussianNB
 
 # Mega Function that takes in dataset
@@ -232,60 +209,5 @@ def run_for_task(features, labels, base_classifiers, prefix):
     filename = prefix + 'all.csv'
     save_df.to_csv(filename)
 
-base_classifiers = ["Logistic_Regression", "Naive_Bayes", "Random_Forest", "NN"]
 
-# Employment task MA
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-acs_data = data_source.get_data(states=["MA"], download=True)
-features, labels, group = ACSEmployment.df_to_numpy(acs_data)
-prefix = "EMP_MA_"
-run_for_task(features, labels, base_classifiers, prefix)
 
-# Employment task Al
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-acs_data = data_source.get_data(states=["AL"], download=True)
-features, labels, group = ACSEmployment.df_to_numpy(acs_data)
-prefix = "EMP_AL_"
-run_for_task(features, labels, base_classifiers, prefix)
-
-# Income Task WA
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["WA"], download=True)
-features, labels, _ = ACSIncome.df_to_numpy(data)
-prefix = "Income_WA_"
-run_for_task(features, labels, base_classifiers, prefix)
-
-# Income Task IL
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["IL"], download=True)
-features, labels, _ = ACSIncome.df_to_numpy(data)
-prefix = "Income_IL_"
-run_for_task(features, labels, base_classifiers, prefix)
-
-# Health Public Coverage Task WI
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["WI"], download=True)
-features, labels, _ = ACSPublicCoverage.df_to_numpy(data)
-prefix = "Health_WI_"
-run_for_task(features, labels, base_classifiers, prefix)
-
-# Health Public Coverage Task OH
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["OH"], download=True)
-features, labels, _ = ACSPublicCoverage.df_to_numpy(data)
-prefix = "Health_OH_"
-run_for_task(features, labels, base_classifiers, prefix)
-
-# ACS Mobility Task NJ
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["NJ"], download=True)
-features, labels, _ = ACSMobility.df_to_numpy(data)
-prefix = "Mobility_NJ_"
-run_for_task(features, labels, base_classifiers, prefix)
-
-# ACS Mobility Task NY
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["NY"], download=True)
-features, labels, _ = ACSMobility.df_to_numpy(data)
-prefix = "Mobility_NY_"
-run_for_task(features, labels, base_classifiers, prefix)

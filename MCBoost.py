@@ -12,7 +12,7 @@ import numpy as np
 import numpy.ma as ma
 from sklearn.linear_model import LinearRegression, Ridge, LogisticRegression
 from sklearn.tree import DecisionTreeRegressor
-
+from sklearn.utils.multiclass import unique_labels
 
 class ProbRange:
     """Simple wrapper class for a range of probabilities;

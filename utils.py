@@ -7,7 +7,7 @@ from sklearn.model_selection import KFold, cross_val_score
 from sklearn.cluster import KMeans
 from matplotlib import pyplot as plt
 from helper_functions import MSCE as MSCE
-import MAccWitness
+from MAccWitness import MAccWitness
 from itertools import product
 
 # grid search on the best parameters

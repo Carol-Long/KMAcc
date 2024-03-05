@@ -12,7 +12,7 @@ from sklearn.utils.multiclass import unique_labels
 from sklearn.neural_network import MLPClassifier
 import cvxpy as cp
 from sklearn.naive_bayes import GaussianNB
-import MAccWitness
+from MAccWitness import MAccWitness
 from utils import grid_search_params
 
 from utils import compute_calibration_error
@@ -41,6 +41,8 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     self._is_fitted = False
     self.wit_model_ = None
     self.gopt = None
+    self._estimator_type = "classifier"
+    
   def fit_model(self, X, y):
     self.model.fit(X, y)
 
