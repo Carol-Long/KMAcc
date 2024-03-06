@@ -266,6 +266,7 @@ class MCBoost:
         self.multiplicative = multiplicative
         self.iter_corrs = [0] * max_iter
         self._is_fitted_ = False
+        self._estimator_type = "classifier"
 
         if subpops is not None:
             self.subpop_fitter = SubpopFitter(subpops)
