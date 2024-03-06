@@ -204,10 +204,10 @@ def run_for_task(features, labels, base_classifiers, prefix):
     # kmulcal_msce_binned, kmulcal_binned_KCE, MCBoost_msce, MCBoost_KCE, isotonic_msce, \
     # isotonic_KCE, sigmoid_msce, sigmoid_KCE, ablated_msce, ablated_KCE, AUC, classifier, prefix, MCBoost_iso_msce, MCBoost_iso_KCE)
 
-    # save data_class
-    save_df = pd.DataFrame(data_class)
-    filename = prefix + 'all.csv'
-    save_df.to_csv(filename)
+  # save data_class
+  save_df = pd.DataFrame(data_class)
+  filename = prefix + 'all.csv'
+  save_df.to_csv(filename)
 
 
 
