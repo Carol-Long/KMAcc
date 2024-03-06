@@ -6,6 +6,6 @@
 #SBATCH --mem=128000
 #SBATCH --mail-type=ALL
 
-module load python/3
+module load python/3.10.12-fasrc01
 mamba activate torchy
 python exp4.py
