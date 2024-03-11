@@ -21,7 +21,7 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
   def __init__(self, baseline_model="Logistic_Regression"):
     # baseline classifiers
     if baseline_model == "Logistic_Regression":
-      self.model = LogisticRegression()
+      self.model = LogisticRegression(max_iter=10000)
     elif baseline_model == "Decision_Tree":
       self.model = DecisionTreeClassifier(max_depth = 1)
     elif baseline_model == "Random_Forest":
@@ -78,7 +78,8 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     print(min(yhat_proba_val + opt_l * wit_val), max(yhat_proba_val + opt_l * wit_val))
     print(f"Lambda: {opt_l}")
     print(f"{np.sum(eps), max(eps), min(eps)}")"""
-    lambdas = np.arange(0, .1, 0.003)
+    # lambdas = np.arange(0, .1, 0.003) # ACS datasets
+    lambdas = np.arange(0, 1, 1e-3)
     divergence = np.zeros(len(lambdas))
     calibration_error = np.zeros(len(lambdas))
 
@@ -87,13 +88,14 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
       g_val, g_val_pred = self.update_proba(yhat_proba_val, lambdas[i], wit_val)
       divergence[i] = np.linalg.norm(yhat_proba_val - g_val)
       calibration_error[i] = compute_calibration_error(wit_val, y_val, g_val)
+    '''
     for i in np.argsort(divergence):
       if calibration_error[i] < alpha:
         self.lambda_opt = lambdas[i]
         break
+    '''
     if self.lambda_opt is None: self.lambda_opt = lambdas[np.nanargmin(calibration_error)]
-
-    print(f"Optimal lambda: {self.lambda_opt}")
+    print("Optimal lambda:", self.lambda_opt)
 
 
     self._is_fitted = True

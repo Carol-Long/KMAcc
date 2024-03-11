@@ -168,7 +168,7 @@ def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test,
   wit_model.fit(X_wit, error_wit)
   wit_test_g_binned = wit_model.predict(X_test)
   kmulcal_binned_KCE = compute_calibration_error(wit_test_g_binned, y_test, g_new)
-  print(f"Our Method's Kernel calibration error, binned: {kmulcal_binned_KCE}")
+  #print(f"Our Method's Kernel calibration error, binned: {kmulcal_binned_KCE}")
 
   # # condition calibration error
   # con_cal_error1 = con_cal_err(num_bins, wit_test, y_test, g_test)
@@ -179,21 +179,21 @@ def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test,
 
   # compare standard calibration metric
   base_msce = MSCE(y_test, yhat_proba_test)
-  print(f'Baseline MSCE: {base_msce:.6f}')
+  #print(f'Baseline MSCE: {base_msce:.6f}')
 
   kmulcal_msce = MSCE(y_test, g_test)
-  print(f'Our Method\'s MSCE: {kmulcal_msce:.6f}')
+  #print(f'Our Method\'s MSCE: {kmulcal_msce:.6f}')
 
   lsboost_msce = MSCE(y_test, test_predictions)
   # print(f'Our Method\'s MS Calibration Error: {MSCE(y_test, g_test):.6f}')
-  print(f'LSBoost MSCE: {lsboost_msce:.6f}')
+  #print(f'LSBoost MSCE: {lsboost_msce:.6f}')
 
   # MSCE for binned f(x) and g(x)
   base_msce_binned = MSCE(y_test, yhat_new)
-  print(f'Baseline MSCE, binned: {base_msce_binned:.6f}')
+  #print(f'Baseline MSCE, binned: {base_msce_binned:.6f}')
 
   kmulcal_msce_binned = MSCE(y_test, g_new)
-  print(f'Our Method\'s MSCE, binned: {kmulcal_msce_binned:.6f}')
+  #print(f'Our Method\'s MSCE, binned: {kmulcal_msce_binned:.6f}')
 
   MCBoost_msce = MSCE(y_test, MCBoost_test)
   # define new witness on MCBoost(updated model)
@@ -201,6 +201,7 @@ def mega_compute_corrected(gopt, witness_metric, wit_test, X_wit, y_wit, X_test,
   wit_model.fit(X_wit, error_wit)
   wit_test_mcboost = wit_model.predict(X_test)
   MCBoost_KCE = compute_calibration_error(wit_test_mcboost, y_test, MCBoost_test)
+  print(f"MCBoost's Kernel calibration error, binned: {MCBoost_KCE}")
 
   MCBoost_iso_msce = MSCE(y_test, prob_test_mcboost_isotonic)
   # define new witness on MCBoost + isotonic

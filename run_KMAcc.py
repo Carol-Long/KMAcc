@@ -47,8 +47,8 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
   MCBoost_iso_KCE = []
 
   save_np = []
-  for seed in range(2, 25, 5):
-    #try:
+  for seed in range(2, 50, 5):
+
     X_train_wit_val, X_test, y_train_wit_val, y_test = train_test_split(
         features, label, test_size=0.3, random_state=seed)
 
@@ -58,8 +58,8 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
     X_wit, X_val, y_wit, y_val = train_test_split(X_wit_val, y_wit_val, test_size=0.4, random_state=seed)
 
     if baseline_model == "Logistic_Regression":
-      model = LogisticRegression()
-      weak_learner = LogisticRegression()
+      model = LogisticRegression(max_iter=10000)
+      weak_learner = LogisticRegression(max_iter=10000)
     elif baseline_model == "Decision_Tree":
       model = DecisionTreeClassifier(max_depth = 1)
       weak_learner = DecisionTreeClassifier(max_depth = 1)
@@ -181,7 +181,7 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
     ablated_msce.append(ablated_msce_temp)
     ablated_KCE.append(ablated_KCE_temp)
     AUC.append(AUC_temp)
-
+    print("\n")
 
   return base_msce, base_KCE, kmulcal_msce, kmulcal_KCE, lsboost_msce, lsboost_KCE, \
          base_msce_binned, base_binned_KCE, kmulcal_msce_binned, kmulcal_binned_KCE, \

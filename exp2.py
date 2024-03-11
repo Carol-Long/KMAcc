@@ -1,19 +1,13 @@
 
-from folktables import ACSDataSource, ACSEmployment, ACSIncome, ACSPublicCoverage, ACSMobility
+import pandas as pd
 from run_KMAcc import run_for_task
 
 base_classifiers = ["Logistic_Regression", "Naive_Bayes", "Random_Forest", "NN"]
-
-# Income Task WA
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["WA"], download=True)
-features, labels, _ = ACSIncome.df_to_numpy(data)
-prefix = "Income_WA_"
-run_for_task(features, labels, base_classifiers, prefix)
-
-# Income Task IL
-data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
-data = data_source.get_data(states=["IL"], download=True)
-features, labels, _ = ACSIncome.df_to_numpy(data)
-prefix = "Income_IL_"
+# Enem
+file_path = 'data/'
+filename = 'enem-50000-20.pkl'
+df = pd.read_pickle(file_path+filename)
+df['gradebin'] = df['gradebin'].astype(int)
+features, labels= df.drop(columns=['gradebin']).to_numpy(), df['gradebin'].to_numpy()
+prefix = "ENEM_"
 run_for_task(features, labels, base_classifiers, prefix)
