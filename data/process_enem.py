@@ -41,7 +41,6 @@ def load_enem20(file_path, filename, features, grade_attribute, n_sample, n_clas
 
     ## Dropping all rows or columns with missing values
     df = df.dropna()
-
     ## Creating racebin & gradebin & sexbin variable
     df['gradebin'] = construct_grade(df, grade_attribute, n_classes)
     if multigroup:
@@ -79,7 +78,8 @@ def load_enem20(file_path, filename, features, grade_attribute, n_sample, n_clas
     df[scale_columns] = pd.DataFrame(scaler.fit_transform(df[scale_columns]), columns=scale_columns, index=df.index)
     # print('Preprocessed Dataset Shape:', df.shape)
 
-    df = df.sample(n=min(n_sample, df.shape[0]), axis=0, replace=False)
+    if n_sample != "full":
+        df = df.sample(n=min(n_sample, df.shape[0]), axis=0, replace=False)
     df['gradebin'] = df['gradebin'].astype(int)
     print('Transformed Dataset Shape:', df.shape)
     return df
@@ -103,7 +103,7 @@ question_vars = ['Q00'+str(x) for x in range(1,10)]
 domestic_vars = ['SG_UF_PROVA', 'TP_FAIXA_ETARIA'] #changed for 2020
 all_vars = label+group_attribute+question_vars+domestic_vars
 n_classes = 2
-enem_size = 50000
+enem_size = "full" #or 50000
 fname = 'enem-' + str(enem_size) + '.pkl'
 df = load_enem20(enem_path, enem_file, all_vars, label, enem_size, n_classes, multigroup=False)
 df.to_pickle(fname)
