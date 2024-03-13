@@ -41,7 +41,7 @@ def achieving_calibration_with_witness(features, label, baseline_model="Logistic
   MCBoost_iso_KME = []
   AUC = []
 
-  for seed in range(2, 50, 5):
+  for seed in range(2, 25, 5):
     X_train_wit_val, X_test, y_train_wit_val, y_test = train_test_split(
         features, label, test_size=0.3, random_state=seed)
 
