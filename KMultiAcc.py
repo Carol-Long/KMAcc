@@ -36,79 +36,81 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     else:
       return "Baseline not supported"
 
-    self.wit_model = None
-    self.opt_lambda_ = None
+    self.max_itr_num = 5
+    self.lambda_opt_ = []
+    self.gamma_opt = []
     self.baseline_model = baseline_model
     self._is_fitted = False
-    self.wit_model_ = None
-    self.gopt = None
     self._estimator_type = "classifier"
-    
+    self.wit_model = []
+
   def fit_model(self, X, y):
     self.classes_ = unique_labels(y)
     self.model.fit(X, y)
 
   def fit(self, X_wit_val, y_wit_val, witness_metric = 'rbf', alpha = .01):
-    # find the best parameter (gamma, lambda) for the witness function using KFold cross validation
-    k = 5
-    kf = KFold(n_splits=k)
+    # find the best parameter (gamma, lambda) for the witness function in each iteration
+    X_wit, X_val, y_wit, y_val = train_test_split(X_wit_val, y_wit_val, test_size=0.5)
     lambdas = np.arange(0, 1, 1e-3)
-    lambda_opt = []
-    gamma_opt = []
-    for wit_index, val_index in kf.split(X_wit_val):
-      X_wit, X_val , y_wit, y_val = X_wit_val[wit_index], X_wit_val[val_index], y_wit_val[wit_index], y_wit_val[val_index]
 
-      yhat_proba_wit = self.model.predict_proba(X_wit)[:, 1]
-      error_wit = y_wit - yhat_proba_wit
-      yhat_proba_val = self.model.predict_proba(X_val)[:, 1]
-      error_val = y_val - yhat_proba_val
+    for i in range(self.max_itr_num):
+      if i == 0:
+        yhat_proba_wit = self.model.predict_proba(X_wit)[:, 1]
+        error_wit = y_wit - yhat_proba_wit
+        yhat_proba_val = self.model.predict_proba(X_val)[:, 1]
+        error_val = y_val - yhat_proba_val
 
       # search for optimal rbf kernel param 
-      gamma_opt.append(grid_search_params(witness_metric, X_val, error_val))
+      self.gamma_opt.append(grid_search_params(witness_metric, X_val, error_val))
 
       # define witness on witness set
-      wit = MAccWitness(gamma=gamma_opt[-1], metric=witness_metric)
+      wit = MAccWitness(gamma=self.gamma_opt[-1], metric=witness_metric)
       wit_model = make_pipeline(StandardScaler(), wit)
       wit_model.fit(X_wit, error_wit)
+      self.wit_model.append(wit_model)
       wit_val = wit_model.predict(X_val)
 
       # search for best lambda (parameter for the updated predictor)
       calibration_error = np.zeros(len(lambdas))
       for i in range(len(lambdas)):
-        g_val, g_val_pred = self.update_proba(yhat_proba_val, lambdas[i], wit_val)
+        g_val, _ = self.update_proba(yhat_proba_val, lambdas[i], wit_val)
         calibration_error[i] = compute_calibration_error(wit_val, y_val, g_val)
-      lambda_opt.append(lambdas[np.nanargmin(calibration_error)])  
+      self.lambda_opt_.append(lambdas[np.nanargmin(calibration_error)])  
 
-    ## Alternative strategy: QP
-    """opt_l, eps = self.solve_qp(yhat_proba_val, y_val, wit_val)
-    self.lambda_opt = opt_l
-    print(min(yhat_proba_val + opt_l * wit_val), max(yhat_proba_val + opt_l * wit_val))
-    print(f"Lambda: {opt_l}")
-    print(f"{np.sum(eps), max(eps), min(eps)}")"""
-  
-    self.gopt = np.mean(gamma_opt)
-    self.lambda_opt = np.mean(lambda_opt)
-    self.wit_model = make_pipeline(StandardScaler(), MAccWitness(gamma=self.gopt, metric=witness_metric))
+      print("Optimal lambda:", self.lambda_opt_[-1])
+      print("Calibration error:", np.nanmin(calibration_error))
+
+      ## Alternative strategy: QP
+      """opt_l, eps = self.solve_qp(yhat_proba_val, y_val, wit_val)
+      self.lambda_opt_ = opt_l
+      print(min(yhat_proba_val + opt_l * wit_val), max(yhat_proba_val + opt_l * wit_val))
+      print(f"Lambda: {opt_l}")
+      print(f"{np.sum(eps), max(eps), min(eps)}")"""
+    
+      # update predicted probabilities using witness
+      yhat_proba_wit = self.update_proba(yhat_proba_wit, self.lambda_opt_[-1], wit_model.predict(X_wit))[0]
+      error_wit = y_wit - yhat_proba_wit
+      yhat_proba_val = self.update_proba(yhat_proba_val, self.lambda_opt_[-1], wit_val)[0]
+      error_val = y_val - yhat_proba_val
     self._is_fitted = True
-    self.wit_model_ = self.wit_model
     return self
 
   def predict_proba(self,X):
-    if self.wit_model == None:
-      raise ValueError("No Witness was fit!")
-
     yhat_proba_test = self.model.predict_proba(X)[:,1]
-    wit_test = self.wit_model.predict(X)
-    yhat_proba_updated, yhat_updated = self.update_proba(yhat_proba_test, self.lambda_opt, wit_test)
-    return np.column_stack((1 - yhat_proba_updated, yhat_proba_updated))
+    # subtract witness iteraitvely
+    for i in range(self.max_itr_num):
+      wit_model = self.wit_model[i]
+      wit_test = wit_model.predict(X)
+      yhat_proba_test, yhat_test = self.update_proba(yhat_proba_test, self.lambda_opt_[i], wit_test)
+    return np.column_stack((1 - yhat_proba_test, yhat_proba_test))
 
   def predict(self, X):
-    if self.wit_model == None:
-      raise ValueError("No Witness was fit!")
     yhat_proba_test = self.model.predict_proba(X)[:,1]
-    wit_test = self.wit_model.predict(X)
-    yhat_proba_updated, yhat_updated = self.update_proba(yhat_proba_test, self.lambda_opt, wit_test)
-    return yhat_updated
+    for i in range(self.max_itr_num):
+      wit_model = self.wit_model[i]
+      wit_test = wit_model.predict(X)
+      yhat_proba_test, yhat_test = self.update_proba(yhat_proba_test, self.lambda_opt_[i], wit_test)
+    return yhat_test
 
   # updated model algorithm using witness
   def update_proba(self, yhat_proba, lambda_, wit_value):
