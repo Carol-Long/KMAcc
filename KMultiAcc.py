@@ -115,9 +115,9 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
       wit_model = self.wit_model[i]
       wit_test = wit_model.predict(X)
       yhat_proba_test, yhat_test = self.update_proba(yhat_proba_test, self.lambda_opt_[i], wit_test)
-      print("Test Sum of square updates:", np.mean((yhat_proba_test-yhat_f0)**2))
+      # print("Test Sum of square updates:", np.mean((yhat_proba_test-yhat_f0)**2))
       # sanity check Delete later!
-      print("Test KME: ", self.wit[i].compute_KME(X, self.y_test, yhat_proba_test))
+      # print("Test KME: ", self.wit[i].compute_KME(X, self.y_test, yhat_proba_test))
     return np.column_stack((1 - yhat_proba_test, yhat_proba_test))
 
   def predict(self, X):

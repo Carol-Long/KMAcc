@@ -72,7 +72,7 @@ class MAccWitness(BaseEstimator, RegressorMixin):
     def score(self, X, y=None):
         return(np.abs(np.corrcoef(self.predict(X),y)[0,1]))
 
-    def compute_KME(self, X, y_test, y):
+    def compute_KME(self, X, y_truth, y_predict_proba):
         """
         compute KME for a given dataset
         """
@@ -87,6 +87,6 @@ class MAccWitness(BaseEstimator, RegressorMixin):
         else:
             raise ValueError('metric not supported')
         
-        return np.mean(np.abs( (y_test-y).T @ K @ self.y_)/self.normalizing_constant)
+        return np.mean(np.abs( (y_truth-y_predict_proba).T @ K @ self.y_)/self.normalizing_constant)
 
 
