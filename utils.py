@@ -173,10 +173,10 @@ def mega_compute_corrected(gopt, witness_metric, X_test, y_test, f_baseline, f_k
           roc_auc_score(y_test, MCBoost_iso_test)]
 
   # compare classification error of the models
-  Classification_Errors = [np.mean(base_test > 0.5 != y_test), np.mean(kMAcc_test > 0.5 != y_test), \
-                          np.mean(LSBoost_test > 0.5 != y_test), np.mean(MCBoost_test > 0.5 != y_test), \
-                          np.mean(base_iso_test > 0.5 != y_test), np.mean(kMAcc_iso_test > 0.5 != y_test), \
-                          np.mean(MCBoost_iso_test > 0.5 != y_test)]
+  Classification_Errors = [np.mean((base_test > 0.5) ^ y_test), np.mean((kMAcc_test > 0.5) ^ y_test), \
+          np.mean((LSBoost_test > 0.5) ^ y_test), np.mean((MCBoost_test > 0.5) ^ y_test), \
+          np.mean((base_iso_test > 0.5) ^ y_test), np.mean((kMAcc_iso_test > 0.5) ^ y_test), \
+          np.mean((MCBoost_iso_test > 0.5) ^ y_test)]
   
   # compare Mean Squared Error of the models
   MSEs = [np.mean((base_test - y_test)**2), np.mean((kMAcc_test - y_test)**2), \

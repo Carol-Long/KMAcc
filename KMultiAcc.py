@@ -43,7 +43,7 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     self._is_fitted = False
     self._estimator_type = "classifier"
     self.wit_model = []
-
+    self.gopt = 1 # standardize gamma for evaluating final KME
     # for sanity check, delete later
     self.y_test = None
     self.wit = []

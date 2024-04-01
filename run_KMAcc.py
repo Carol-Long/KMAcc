@@ -56,8 +56,8 @@ def achieving_calibration_with_witness(features, labels, baseline_model="Logisti
       model = GaussianNB()
       weak_learner = GaussianNB()
     elif baseline_model == "NN":
-      model = MLPClassifier(random_state=seed, max_iter=300)
-      weak_learner = MLPClassifier(random_state=1, max_iter=300)
+      model = MLPClassifier(random_state=seed, max_iter=30)
+      weak_learner = MLPClassifier(random_state=1, max_iter=30)
     else:
       return "Baseline not supported"
 

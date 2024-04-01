@@ -2,7 +2,7 @@
 from folktables import ACSDataSource, ACSEmployment, ACSIncome, ACSPublicCoverage, ACSMobility
 from run_KMAcc import run_for_task
 
-base_classifiers = ["Logistic_Regression", "Naive_Bayes", "Random_Forest", "NN"]
+base_classifiers = ["Logistic_Regression", "Naive_Bayes", "Random_Forest", "NN", "Decision_Tree"]
 
 # Employment task MA
 data_source = ACSDataSource(survey_year='2018', horizon='1-Year', survey='person')
