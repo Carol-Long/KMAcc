@@ -36,7 +36,7 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     else:
       return "Baseline not supported"
 
-    self.max_itr_num = 5
+    self.max_itr_num = 10
     self.lambda_opt_ = []
     self.gamma_opt = []
     self.baseline_model = baseline_model
@@ -44,14 +44,18 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     self._estimator_type = "classifier"
     self.wit_model = []
 
+    # for sanity check, delete later
+    self.y_test = None
+    self.wit = []
+
   def fit_model(self, X, y):
     self.classes_ = unique_labels(y)
     self.model.fit(X, y)
 
-  def fit(self, X_wit_val, y_wit_val, witness_metric = 'rbf', alpha = .01):
+  def fit(self, X_wit_val, y_wit_val, witness_metric = 'rbf', alpha = .75):
     # find the best parameter (gamma, lambda) for the witness function in each iteration
-    X_wit, X_val, y_wit, y_val = train_test_split(X_wit_val, y_wit_val, test_size=0.5)
-    lambdas = np.arange(0, 1, 1e-3)
+    X_wit, X_val, y_wit, y_val = train_test_split(X_wit_val, y_wit_val, test_size=0.5, random_state=42)
+    lambdas = np.arange(0, 1, 1e-1)
 
     for i in range(self.max_itr_num):
       if i == 0:
@@ -59,6 +63,7 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
         error_wit = y_wit - yhat_proba_wit
         yhat_proba_val = self.model.predict_proba(X_val)[:, 1]
         error_val = y_val - yhat_proba_val
+        yhat_f0 = yhat_proba_val
 
       # search for optimal rbf kernel param 
       self.gamma_opt.append(grid_search_params(witness_metric, X_val, error_val))
@@ -68,17 +73,24 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
       wit_model = make_pipeline(StandardScaler(), wit)
       wit_model.fit(X_wit, error_wit)
       self.wit_model.append(wit_model)
+      # for sanity check, delete later
+      self.wit.append(wit)
       wit_val = wit_model.predict(X_val)
 
       # search for best lambda (parameter for the updated predictor)
-      calibration_error = np.zeros(len(lambdas))
+      calibration_error = np.zeros(len(lambdas)) # KME
+      mse_f0 = np.zeros(len(lambdas)) # mean squared error wrt to f_0
       for i in range(len(lambdas)):
         g_val, _ = self.update_proba(yhat_proba_val, lambdas[i], wit_val)
-        calibration_error[i] = compute_calibration_error(wit_val, y_val, g_val)
-      self.lambda_opt_.append(lambdas[np.nanargmin(calibration_error)])  
+        calibration_error[i] = wit.compute_KME(X_val, y_val, g_val)
+        mse_f0[i] = np.mean((g_val-yhat_f0)**2)
 
+      # sort mse_f0, pick the smallest whose calibration_error is less than alpha
+      temp_alpha = min(calibration_error)+(np.max(calibration_error)-np.min(calibration_error))/(2+i)
+      valid_lambdas = lambdas[calibration_error < temp_alpha]
+      min_mse_index = np.argmin(mse_f0[calibration_error < temp_alpha])
+      self.lambda_opt_.append(valid_lambdas[min_mse_index])
       print("Optimal lambda:", self.lambda_opt_[-1])
-      print("Calibration error:", np.nanmin(calibration_error))
 
       ## Alternative strategy: QP
       """opt_l, eps = self.solve_qp(yhat_proba_val, y_val, wit_val)
@@ -97,11 +109,15 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
 
   def predict_proba(self,X):
     yhat_proba_test = self.model.predict_proba(X)[:,1]
+    yhat_f0 = yhat_proba_test
     # subtract witness iteraitvely
     for i in range(self.max_itr_num):
       wit_model = self.wit_model[i]
       wit_test = wit_model.predict(X)
       yhat_proba_test, yhat_test = self.update_proba(yhat_proba_test, self.lambda_opt_[i], wit_test)
+      print("Test Sum of square updates:", np.mean((yhat_proba_test-yhat_f0)**2))
+      # sanity check Delete later!
+      print("Test KME: ", self.wit[i].compute_KME(X, self.y_test, yhat_proba_test))
     return np.column_stack((1 - yhat_proba_test, yhat_proba_test))
 
   def predict(self, X):

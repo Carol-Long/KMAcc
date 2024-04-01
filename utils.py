@@ -12,6 +12,7 @@ from itertools import product
 
 # grid search on the best parameters
 def grid_search_params(witness_metric, X_val, y_val):
+    return 1
     n_splits = 5
     kf = KFold(n_splits=n_splits, random_state = 42, shuffle=True)
     if witness_metric == 'rbf':

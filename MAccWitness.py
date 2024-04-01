@@ -17,6 +17,10 @@ class MAccWitness(BaseEstimator, RegressorMixin):
         self.degree = degree
         self.coef0 = coef0
         self.metric = metric
+        self.normalizing_constant = 1
+        self.X_ = None # D_0
+        self.y_ = None # error on D_0 wrt a model
+        self.n_ = None # number of samples in D_0
 
     def fit(self, X, y=None):
         """
@@ -27,7 +31,21 @@ class MAccWitness(BaseEstimator, RegressorMixin):
         self.y_ = y.reshape(len(y),1)
         self.n_ = len(self.y_)
 
+        # compute normalizing constant
+        if self.metric == 'rbf':
+            K = pairwise_kernels(X,X,metric=self.metric,gamma=self.gamma)
+        elif self.metric == 'linear':
+            K = pairwise_kernels(X,X,metric=self.metric)
+        elif self.metric == 'poly':
+            K = pairwise_kernels(X,X,metric=self.metric, degree=self.degree, coef0=self.coef0, gamma=self.gamma)
+        elif self.metric == 'sigmoid':
+            K = pairwise_kernels(X,X,metric=self.metric, coef0=self.coef0, gamma=self.gamma)
+        else:
+            raise ValueError('metric not supported')     
+        self.normalizing_constant = np.sqrt(self.y_.T @ K @ self.y_)[0][0]
+        # print("normalizing constant: ", self.normalizing_constant)
         return self
+    
     def predict(self, X, y=None):
         """
         making prediction of error on new data (y is error here)
@@ -48,10 +66,27 @@ class MAccWitness(BaseEstimator, RegressorMixin):
             K = pairwise_kernels(X,self.X_,metric=self.metric, coef0=self.coef0, gamma=self.gamma)
         else:
             raise ValueError('metric not supported')
-        prod = np.ravel(K@self.y_)
-
+        prod = np.ravel(K@self.y_)/self.normalizing_constant
         return prod
 
     def score(self, X, y=None):
         return(np.abs(np.corrcoef(self.predict(X),y)[0,1]))
+
+    def compute_KME(self, X, y_test, y):
+        """
+        compute KME for a given dataset
+        """
+        if self.metric == 'rbf':
+            K = pairwise_kernels(X,self.X_,metric=self.metric,gamma=self.gamma)
+        elif self.metric == 'linear':
+            K = pairwise_kernels(X,self.X_,metric=self.metric)
+        elif self.metric == 'poly':
+            K = pairwise_kernels(X,self.X_,metric=self.metric, degree=self.degree, coef0=self.coef0, gamma=self.gamma)
+        elif self.metric == 'sigmoid':
+            K = pairwise_kernels(X,self.X_,metric=self.metric, coef0=self.coef0, gamma=self.gamma)
+        else:
+            raise ValueError('metric not supported')
+        
+        return np.mean(np.abs( (y_test-y).T @ K @ self.y_)/self.normalizing_constant)
+
 
