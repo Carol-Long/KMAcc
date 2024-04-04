@@ -55,7 +55,7 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
   def fit(self, X_wit_val, y_wit_val, witness_metric = 'rbf', alpha = .75):
     # find the best parameter (gamma, lambda) for the witness function in each iteration
     X_wit, X_val, y_wit, y_val = train_test_split(X_wit_val, y_wit_val, test_size=0.5, random_state=42)
-    lambdas = np.arange(0, 1, 1e-1)
+    lambdas = np.arange(0, 2, 1e-1)
 
     for i in range(self.max_itr_num):
       if i == 0:

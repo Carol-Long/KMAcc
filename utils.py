@@ -6,7 +6,6 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.cluster import KMeans
 from matplotlib import pyplot as plt
-from helper_functions import MSCE as MSCE
 from MAccWitness import MAccWitness
 from itertools import product
 
@@ -103,6 +102,29 @@ def compute_KME(X_test, y_test, model, gopt, witness_metric):
 # compute calibration error
 def compute_calibration_error(wit_value, y_pred, yhat_proba):
   return np.abs((wit_value * (y_pred - yhat_proba)).mean())
+
+def MSCE(y_test, y_proba, num_bins=20):
+    # get the difference
+    difference_array = y_test - y_proba
+    
+    # initialize bins
+    bin_width = 1 / num_bins
+    residuals_binned = np.zeros(num_bins)
+    count_per_bin = np.zeros(num_bins)
+    
+    for i in range(len(y_proba)):
+        bin_index = int(y_proba[i] // bin_width)
+        residuals_binned[bin_index] += difference_array[i]
+        count_per_bin[bin_index] += 1
+    
+    # avoid divide by 0
+    count_per_bin[count_per_bin == 0] = 1
+    # print(residuals_binned)
+    # print(count_per_bin)
+    residuals_binned = (residuals_binned/count_per_bin)**2 
+    msce_value = np.sum(residuals_binned* (count_per_bin/ len(y_proba)))
+    # print(residuals_binned)
+    return msce_value
 
 def mega_compute_corrected(gopt, witness_metric, X_test, y_test, f_baseline, f_kMAcc, f_LSBoost, f_MCBoost, \
                            f_base_iso, f_kMAcc_iso, f_MCBoost_iso):
