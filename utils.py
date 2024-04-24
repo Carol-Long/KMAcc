@@ -103,7 +103,7 @@ def compute_KME(X_test, y_test, model, gopt, witness_metric):
 def compute_calibration_error(wit_value, y_pred, yhat_proba):
   return np.abs((wit_value * (y_pred - yhat_proba)).mean())
 
-def MSCE(y_test, y_proba, num_bins=20):
+def MSCE_new(y_test, y_proba, num_bins=20):
     # get the difference
     difference_array = y_test - y_proba
     
@@ -174,13 +174,13 @@ def mega_compute_corrected(gopt, witness_metric, X_test, y_test, f_baseline, f_k
   MCBoost_iso_test = f_MCBoost_iso.predict_proba(X_test)[:, 1]
 
   # compare standard calibration metric
-  base_msce = MSCE(y_test, base_test)
-  kMacc_msce = MSCE(y_test, kMAcc_test)
-  LSBoost_msce = MSCE(y_test, LSBoost_test)
-  MCBoost_msce = MSCE(y_test, MCBoost_test)
-  base_iso_msce = MSCE(y_test, base_iso_test)
-  kMacc_iso_msce = MSCE(y_test, kMAcc_iso_test)
-  MCBoost_iso_msce = MSCE(y_test, MCBoost_iso_test)
+  base_msce = MSCE_new(y_test, base_test)
+  kMacc_msce = MSCE_new(y_test, kMAcc_test)
+  LSBoost_msce = MSCE_new(y_test, LSBoost_test)
+  MCBoost_msce = MSCE_new(y_test, MCBoost_test)
+  base_iso_msce = MSCE_new(y_test, base_iso_test)
+  kMacc_iso_msce = MSCE_new(y_test, kMAcc_iso_test)
+  MCBoost_iso_msce = MSCE_new(y_test, MCBoost_iso_test)
 
   # compare KME of the models
   KMEs = [base_KME, kMAcc_KME, LSBoost_KME, MCBoost_KME, base_iso_KME, kMAcc_iso_KME, MCBoost_iso_KME]
