@@ -1,4 +1,5 @@
 import sys
+import os
 sys.path.append('Level-Set-Boosting')
 from utils import *
 from KMultiAcc import KMultiAcc
@@ -18,7 +19,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.naive_bayes import GaussianNB
 
 # Mega Function that takes in dataset
-def achieving_calibration_with_witness(features, labels, baseline_model="Logistic_Regression", witness_metric = 'rbf'):
+def achieving_calibration_with_witness(features, labels, baseline_model="Logistic_Regression", witness_metric = 'rbf', prefix = ""):
   scaler = StandardScaler()
   #fit transform data
   features = scaler.fit_transform(features, labels)
@@ -97,7 +98,7 @@ def achieving_calibration_with_witness(features, labels, baseline_model="Logisti
     mcboost_iso.fit(X_val, y_val)
 
     KMEs_itr, MSCEs_itr, AUCs_itr, Classification_Errors_itr, MSEs_itr = mega_compute_corrected(kma.gopt, witness_metric, X_test, y_test, model, kma, \
-            LSBoostReg, f_MCBoost, base_iso, kMAcc_iso, mcboost_iso)
+            LSBoostReg, f_MCBoost, base_iso, kMAcc_iso, mcboost_iso, seed, baseline_model, prefix)
     
     MSCE_all.append(MSCEs_itr)
     KME_all.append(KMEs_itr)
@@ -112,11 +113,14 @@ def achieving_calibration_with_witness(features, labels, baseline_model="Logisti
 def run_for_task(features, labels, base_classifiers, prefix):
   data_class = []
   for classifier in base_classifiers:
-    MSCE_all, KME_all, AUC_all, Classification_Errors_all, MSE_all = achieving_calibration_with_witness(features, labels, classifier)
+    MSCE_all, KME_all, AUC_all, Classification_Errors_all, MSE_all = achieving_calibration_with_witness(features, labels, classifier, prefix)
 
     data_class.append((MSCE_all, KME_all, AUC_all, Classification_Errors_all, MSE_all))
 
   # save data_class
+  result_path = './results/'
+  if not os.path.exists(result_path):
+    os.makedirs(result_path)
   save_df = pd.DataFrame(data_class)
   filename = prefix + 'all.csv'
-  save_df.to_csv(filename)
+  save_df.to_csv(result_path + filename)
