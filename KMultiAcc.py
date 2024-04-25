@@ -14,8 +14,6 @@ import cvxpy as cp
 from sklearn.naive_bayes import GaussianNB
 from MAccWitness import MAccWitness
 from utils import grid_search_params
-
-from utils import compute_calibration_error
 from sklearn.model_selection import KFold
 
 class KMultiAcc(BaseEstimator, RegressorMixin):

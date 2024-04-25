@@ -113,7 +113,7 @@ def achieving_calibration_with_witness(features, labels, baseline_model="Logisti
 def run_for_task(features, labels, base_classifiers, prefix):
   data_class = []
   for classifier in base_classifiers:
-    MSCE_all, KME_all, AUC_all, Classification_Errors_all, MSE_all = achieving_calibration_with_witness(features, labels, classifier, prefix)
+    MSCE_all, KME_all, AUC_all, Classification_Errors_all, MSE_all = achieving_calibration_with_witness(features, labels, classifier, "rbf", prefix)
 
     data_class.append((MSCE_all, KME_all, AUC_all, Classification_Errors_all, MSE_all))
 

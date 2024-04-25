@@ -14,7 +14,7 @@ import os
 def gen_preds(model):
     return lambda x: model.predict_proba(x)[:, 1] # get predictions from MCBoost
 
-def compute_KME_Wrapper(X_test, y_test, model, gopt, witness_metric):
+def compute_KME_Wrapper(X_test, y_test, model, gopt, witness_metric='rbf'):
     # K fold cross validation on the test set
     n_splits = 5
     kf = KFold(n_splits=n_splits, random_state = 42, shuffle=True)
