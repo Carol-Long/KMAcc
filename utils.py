@@ -9,64 +9,6 @@ from matplotlib import pyplot as plt
 from MAccWitness import MAccWitness
 from itertools import product
 
-# grid search on the best parameters
-def grid_search_params(witness_metric, X_val, y_val):
-    return 1 # reduce complexity of the model
-    n_splits = 5
-    kf = KFold(n_splits=n_splits, random_state = 42, shuffle=True)
-    if witness_metric == 'rbf':
-        gamma = np.arange(1, 10, 0.5)
-        scores = np.zeros(len(gamma))
-        for g in range(len(gamma)):
-            wit = MAccWitness(gamma=gamma[g], metric=witness_metric)
-            wit_model = make_pipeline(StandardScaler(), wit)
-            score = cross_val_score(wit_model,X_val ,y_val,cv=kf,n_jobs=n_splits).mean()
-            scores[g] = score
-        #defining the optimal found witness function
-        idx_max = np.nanargmax(scores.flatten())
-        gopt = gamma[idx_max]
-        print(f"Optimal Gamma: {gopt}")
-        return gopt
-
-    elif witness_metric == 'sigmoid':
-        gamma = np.arange(1,10,0.5)
-        coef0 = np.arange(-5, 5, 1)
-        combos = list(product(range(len(gamma)), range(len(coef0))))
-        scores = np.zeros((len(gamma), len(coef0)))
-        #evaluating for each gamma the resulting witness function
-        for g, c in combos:
-            wit = MAccWitness(gamma=gamma[g], metric=witness_metric, coef0=coef0[c])
-            wit_model = make_pipeline(StandardScaler(), wit)
-            score = cross_val_score(wit_model,X_val,y_val,cv=kf,n_jobs=n_splits).mean()
-            scores[g, c] = score
-        #defining the optimal found witness function
-        idx_max = np.nanargmax(scores.flatten())
-        gopt, copt = combos[idx_max]
-        gopt, copt = gamma[gopt], coef0[copt]
-        print(f"Optimal Gamma: {gopt}, Optimal Coef: {copt}")
-        return [gopt, copt]
-
-    elif witness_metric == 'poly':
-        # Optimal Gamma: 0.05, Optimal Coef: 1.5, Optimal Degree: 2
-        gamma = [0.04, 0.05, 0.06, 0.1, 0.5]
-        coef0 = [0, 0.5, 0.7, 1, 1.5, 2]
-        degree = [2,3,4]
-        combos = list(product(range(len(gamma)), range(len(coef0)), range(len(degree))))
-        scores = np.zeros((len(gamma), len(coef0), len(degree)))
-
-        #evaluating for each gamma the resulting witness function
-        for g, c, d in combos:
-            wit = MAccWitness(gamma=gamma[g], metric=witness_metric, coef0=coef0[c], degree=degree[d])
-            wit_model = make_pipeline(StandardScaler(), wit)
-            score = cross_val_score(wit_model,X_val,y_val,cv=kf,n_jobs=n_splits).mean()
-            scores[g, c] = score
-        #defining the optimal found witness function
-        idx_max = np.nanargmax(scores.flatten())
-        gopt, copt, dopt = combos[idx_max]
-        gopt, copt, dopt = gamma[gopt], coef0[copt], degree[dopt]
-        print(f"Optimal Gamma: {gopt}, Optimal Coef: {copt}, Optimal Degree: {dopt}")
-        return [gopt, copt, dopt]
-    
 def gen_preds(model):
     return lambda x: model.predict_proba(x)[:, 1] # get predictions from MCBoost
 
@@ -98,10 +40,6 @@ def compute_KME(X_test, y_test, model, gopt, witness_metric):
     KME[i] = wit.compute_KME(X_test_temp, y_test_temp, yhat_proba_test) 
     KME_std[i] = np.std(wit_test * (y_test_temp - yhat_proba_test))
   return KME.mean(), KME_std.mean(), KME_witfit.mean(), KME_witfit_std.mean()
-
-# compute calibration error
-def compute_calibration_error(wit_value, y_pred, yhat_proba):
-  return np.abs((wit_value * (y_pred - yhat_proba)).mean())
 
 def MSCE_new(y_test, y_proba, num_bins=20):
     # get the difference
@@ -207,3 +145,62 @@ def mega_compute_corrected(gopt, witness_metric, X_test, y_test, f_baseline, f_k
           np.mean((MCBoost_iso_test - y_test)**2)]
   
   return KMEs, MSCEs, AUCs, Classification_Errors, MSEs
+
+# grid search on the best parameters
+def grid_search_params(witness_metric, X_val, y_val):
+    #return 1 # reduce complexity of the model
+    n_splits = 5
+    kf = KFold(n_splits=n_splits, random_state = 42, shuffle=True)
+    if witness_metric == 'rbf':
+        gamma = np.arange(1, 10, 0.5)
+        scores = np.zeros(len(gamma))
+        for g in range(len(gamma)):
+            wit = MAccWitness(gamma=gamma[g], metric=witness_metric)
+            wit_model = make_pipeline(StandardScaler(), wit)
+            score = cross_val_score(wit_model,X_val ,y_val,cv=kf,n_jobs=n_splits).mean()
+            scores[g] = score
+        #defining the optimal found witness function
+        idx_max = np.nanargmax(scores.flatten())
+        gopt = gamma[idx_max]
+        print(f"Optimal Gamma: {gopt}")
+        return gopt
+
+    elif witness_metric == 'sigmoid':
+        gamma = np.arange(1,10,0.5)
+        coef0 = np.arange(-5, 5, 1)
+        combos = list(product(range(len(gamma)), range(len(coef0))))
+        scores = np.zeros((len(gamma), len(coef0)))
+        #evaluating for each gamma the resulting witness function
+        for g, c in combos:
+            wit = MAccWitness(gamma=gamma[g], metric=witness_metric, coef0=coef0[c])
+            wit_model = make_pipeline(StandardScaler(), wit)
+            score = cross_val_score(wit_model,X_val,y_val,cv=kf,n_jobs=n_splits).mean()
+            scores[g, c] = score
+        #defining the optimal found witness function
+        idx_max = np.nanargmax(scores.flatten())
+        gopt, copt = combos[idx_max]
+        gopt, copt = gamma[gopt], coef0[copt]
+        print(f"Optimal Gamma: {gopt}, Optimal Coef: {copt}")
+        return [gopt, copt]
+
+    elif witness_metric == 'poly':
+        # Optimal Gamma: 0.05, Optimal Coef: 1.5, Optimal Degree: 2
+        gamma = [0.04, 0.05, 0.06, 0.1, 0.5]
+        coef0 = [0, 0.5, 0.7, 1, 1.5, 2]
+        degree = [2,3,4]
+        combos = list(product(range(len(gamma)), range(len(coef0)), range(len(degree))))
+        scores = np.zeros((len(gamma), len(coef0), len(degree)))
+
+        #evaluating for each gamma the resulting witness function
+        for g, c, d in combos:
+            wit = MAccWitness(gamma=gamma[g], metric=witness_metric, coef0=coef0[c], degree=degree[d])
+            wit_model = make_pipeline(StandardScaler(), wit)
+            score = cross_val_score(wit_model,X_val,y_val,cv=kf,n_jobs=n_splits).mean()
+            scores[g, c] = score
+        #defining the optimal found witness function
+        idx_max = np.nanargmax(scores.flatten())
+        gopt, copt, dopt = combos[idx_max]
+        gopt, copt, dopt = gamma[gopt], coef0[copt], degree[dopt]
+        print(f"Optimal Gamma: {gopt}, Optimal Coef: {copt}, Optimal Degree: {dopt}")
+        return [gopt, copt, dopt]
+    

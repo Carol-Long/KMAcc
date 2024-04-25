@@ -86,9 +86,18 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
         mse_f0[i] = np.mean((g_val-yhat_f0)**2)
 
       # sort mse_f0, pick the smallest whose calibration_error is less than alpha
-      temp_alpha = min(calibration_error)+(np.max(calibration_error)-np.min(calibration_error))/(2+i)
+      alpha_min = min(calibration_error)
+      alpha_max = max(calibration_error)
+      alpha_new = min(max(alpha_min, alpha), alpha_max)
+      temp_alpha = alpha_new +   (alpha_max - alpha_new)/(2+i)
+      # temp_alpha = min(calibration_error)+(np.max(calibration_error)-np.min(calibration_error))/(2+i)
       valid_lambdas = lambdas[calibration_error < temp_alpha]
       min_mse_index = np.argmin(mse_f0[calibration_error < temp_alpha])
+
+      # no update necessary
+      if valid_lambdas[min_mse_index] == 0:
+        break
+
       self.lambda_opt_.append(valid_lambdas[min_mse_index])
       print("Optimal lambda:", self.lambda_opt_[-1])
 
@@ -111,7 +120,7 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     yhat_proba_test = self.model.predict_proba(X)[:,1]
     yhat_f0 = yhat_proba_test
     # subtract witness iteraitvely
-    for i in range(self.max_itr_num):
+    for i in range(len(self.lambda_opt_)):
       wit_model = self.wit_model[i]
       wit_test = wit_model.predict(X)
       yhat_proba_test, yhat_test = self.update_proba(yhat_proba_test, self.lambda_opt_[i], wit_test)
@@ -122,7 +131,7 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
 
   def predict(self, X):
     yhat_proba_test = self.model.predict_proba(X)[:,1]
-    for i in range(self.max_itr_num):
+    for i in range(len(self.lambda_opt_)):
       wit_model = self.wit_model[i]
       wit_test = wit_model.predict(X)
       yhat_proba_test, yhat_test = self.update_proba(yhat_proba_test, self.lambda_opt_[i], wit_test)
@@ -137,57 +146,57 @@ class KMultiAcc(BaseEstimator, RegressorMixin):
     yhat_pred = (yhat_proba > 0.5).astype('int')
     return yhat_proba, yhat_pred
 
-  def solve_qp(self, f, y, c, alpha = .02):
-    #f is predictor on validation points
-    #y is true label validation points
-    #c is witness function applied to validation points
+  # def solve_qp(self, f, y, c, alpha = .02):
+  #   #f is predictor on validation points
+  #   #y is true label validation points
+  #   #c is witness function applied to validation points
 
-    with open('qp.npy', 'wb') as file:
-      np.save(file, f)
-      np.save(file, y)
-      np.save(file, c)
+  #   with open('qp.npy', 'wb') as file:
+  #     np.save(file, f)
+  #     np.save(file, y)
+  #     np.save(file, c)
 
-    n = len(f) #n is dim
+  #   n = len(f) #n is dim
 
-    #alpha is multiaccuracy constraint
+  #   #alpha is multiaccuracy constraint
 
-    f.reshape((len(f), 1))
+  #   f.reshape((len(f), 1))
 
-    A = np.row_stack((c.T / n, -1 * c.T / n, np.diag(np.ones(n)), np.diag(np.ones(n))))
-    print(f"A: {A.shape}")
-    b = np.row_stack((alpha + c.T @ y / n, alpha - c.T @ y / n, np.ones((n, 1)), np.ones((n, 1))))
-    print(f"b: {b.shape}")
-    print(f"n: {n}")
+  #   A = np.row_stack((c.T / n, -1 * c.T / n, np.diag(np.ones(n)), np.diag(np.ones(n))))
+  #   print(f"A: {A.shape}")
+  #   b = np.row_stack((alpha + c.T @ y / n, alpha - c.T @ y / n, np.ones((n, 1)), np.ones((n, 1))))
+  #   print(f"b: {b.shape}")
+  #   print(f"n: {n}")
 
-    print(f"A@f: {(A @ f / n).shape}")
-    Bmat = 1 / 2 * A @ A.T
-    d = b - (A @ f).reshape((len(b), 1))
+  #   print(f"A@f: {(A @ f / n).shape}")
+  #   Bmat = 1 / 2 * A @ A.T
+  #   d = b - (A @ f).reshape((len(b), 1))
 
-    print(f"Bmat: {Bmat.shape}")
-    #print(f"Rank of Bmat: {np.linalg.matrix_rank(Bmat)}")
-    """u, s, v = np.linalg.svd(A)
-    print(f"SVD: {s}")
-    plt.hist(s)
-    plt.show()
-    print("f")
-    print(f"Condition number of Bmat: {np.linalg.cond(Bmat)}")
-    eigdecomp = np.linalg.eig(Bmat)
-    print(f"Notable eig of Bmat: {eigdecomp[0]}")
-    print(f"Norm of C: {np.linalg.norm(c)}")
-    plt.hist(c)
-    plt.show()"""
-    print(f"d: {d.shape}")
-    print(f"f: {f.shape}")
+  #   print(f"Bmat: {Bmat.shape}")
+  #   #print(f"Rank of Bmat: {np.linalg.matrix_rank(Bmat)}")
+  #   """u, s, v = np.linalg.svd(A)
+  #   print(f"SVD: {s}")
+  #   plt.hist(s)
+  #   plt.show()
+  #   print("f")
+  #   print(f"Condition number of Bmat: {np.linalg.cond(Bmat)}")
+  #   eigdecomp = np.linalg.eig(Bmat)
+  #   print(f"Notable eig of Bmat: {eigdecomp[0]}")
+  #   print(f"Norm of C: {np.linalg.norm(c)}")
+  #   plt.hist(c)
+  #   plt.show()"""
+  #   print(f"d: {d.shape}")
+  #   print(f"f: {f.shape}")
 
-    L = cp.Variable((2 * n + 2, 1))
-    print(f"L: {L.shape}")
-    constraints = [0 <= L]
-    objective = cp.Minimize(cp.quad_form(L, cp.Parameter(shape=Bmat.shape, value = Bmat, PSD=True)) + d.T @ L)
-    prob = cp.Problem(objective, constraints)
+  #   L = cp.Variable((2 * n + 2, 1))
+  #   print(f"L: {L.shape}")
+  #   constraints = [0 <= L]
+  #   objective = cp.Minimize(cp.quad_form(L, cp.Parameter(shape=Bmat.shape, value = Bmat, PSD=True)) + d.T @ L)
+  #   prob = cp.Problem(objective, constraints)
 
-    result = prob.solve(solver=cp.SCS)
-    val = L.value
-    l = (val[1] - val[0]) / n
-    print(f"Lambda dual: {val[0], val[1]}")
-    eps = (val[n+2:] - val[2:n+2])
-    return l, eps
+  #   result = prob.solve(solver=cp.SCS)
+  #   val = L.value
+  #   l = (val[1] - val[0]) / n
+  #   print(f"Lambda dual: {val[0], val[1]}")
+  #   eps = (val[n+2:] - val[2:n+2])
+  #   return l, eps
